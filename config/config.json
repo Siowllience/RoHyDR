@@ -1,0 +1,88 @@
+{
+  "datasetCommonParams": {
+    "dataset_root_dir": "/dataset",
+    "mosi": {
+      "aligned": {
+        "featurePath": "MOSI/aligned_50.pkl",
+        "feature_dims": [768, 5, 20],
+        "train_samples": 1284,
+        "num_classes": 3,
+        "language": "en",
+        "KeyEval": "Loss"
+      }
+    }
+    
+  },
+  "rohydr": {
+    "commonParams": {
+      "need_data_aligned": true,
+      "need_model_aligned": true,
+      "early_stop": 20,
+      "use_bert": true,
+      "use_finetune": true,
+      "attn_mask": true,
+      "update_epochs": 1,
+      "need_normalized": false,
+      "use_bert_finetune": true,
+      "fusion": "structure_one",
+      "reconstruction": "structure_one",
+      "discriminator": "structure_one",
+      "classifier": "structure_one"
+  },
+    "datasetParams": {
+      "mosi": {
+        "attn_dropout_a": 0.5,
+        "attn_dropout_v": 0.5,
+        "relu_dropout": 0.5,
+        "embed_dropout": 0.5,
+        "res_dropout": 0.5,
+        "dst_feature_dim_nheads": [32, 8],
+        "batch_size": 32,  
+        "learning_rate": 0.002, 
+        "nlevels": 4,
+        "conv1d_kernel_size_l": 3,
+        "conv1d_kernel_size_a": 3,
+        "conv1d_kernel_size_v": 3,
+        "text_dropout": 0.5,
+        "attn_dropout": 0.5,
+        "output_dropout": 0.5,
+        "grad_clip": 0.6,  
+        "patience": 24,
+        "weight_decay": 0.0005,  
+        "transformers": "bert",
+        "pretrained": "bert-base-uncased",
+        "fus_d_l": 32,
+        "fus_d_a": 32,
+        "fus_d_v": 32,
+        "fus_conv1d_kernel_l": 3,
+        "fus_conv1d_kernel_a": 3,
+        "fus_conv1d_kernel_v": 9,
+        "fus_nheads": 8,
+        "fus_layers": 3,
+        "fus_attn_mask": 1,
+        "fus_position_embedding": 0,
+        "fus_relu_dropout": 0.0,
+        "fus_embed_dropout": 0.5,
+        "fus_res_dropout": 0.4,
+        "fus_attn_dropout": 0.5,
+        "rec_hidden_dim1": 80,
+        "rec_dropout": 0.4,
+        "rec_hidden_dim2": 96,
+        "disc_hidden_dim1": 128,
+        "disc_hidden_dim2": 64,
+        "clf_dropout": 0.3,
+        "clf_hidden_dim": 80,
+        "lambda_g": 1,
+        "lambda_al": 0.5,
+        "lambda_c": 0.4,
+        "decay": 1e-05,
+        "learning_rate_bert": 2e-05,
+        "learning_rate_other": 0.0005,
+        "weight_decay_bert": 0.0001,
+        "weight_decay_other": 0.0005
+
+    }
+      
+    }
+  }
+  }
