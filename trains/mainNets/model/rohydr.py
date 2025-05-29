@@ -12,8 +12,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 
-from ...subNets_adversarial import BertTextEncoderAdversarial
-from ...subNets_adversarial.transformers_encoder.transformer import TransformerEncoder
+from ...subNets_adv import BertTextEncoderAdversarial
+from ...subNets_adv.transformers_encoder.transformer import TransformerEncoder
 
 __all__ = ['ROHYDR']
 
