@@ -32,15 +32,37 @@ class ROHYDR():
         min_or_max = 'min' if self.args.KeyEval in ['Loss'] else 'max'
         best_valid = 1e8 if min_or_max == 'min' else 0
 
-        #To reproduce the results of the paper, you can load the pre-trained model here. Please write the path of the pre-trained model.
-        # origin_model = torch.load('/pretrained/pretrained-{}.pth'.format(self.args.dataset_name))
-        # net_dict = model.state_dict()
-        # new_state_dict = {}
-        # for k, v in origin_model.items():
-        #     k = k.replace('Model.', '')
-        #     new_state_dict[k] = v
-        # net_dict.update(new_state_dict)
-        # model.load_state_dict(net_dict,strict=False)
+
+        # total_params = sum(p.numel() for p in model.parameters())
+        # print(f"Total parameters before load: {total_params:,}")
+
+        # To reproduce the results of the paper, you can load the pre-trained model here. Please write the path of the pre-trained model.
+        origin_model = torch.load('pretrained/pretrained-{}.pth'.format(self.args.dataset_name))
+        net_dict = model.state_dict()
+        new_state_dict = {}
+        for k, v in origin_model.items():
+            k = k.replace('Model.', '')
+            new_state_dict[k] = v
+        net_dict.update(new_state_dict)
+        model.load_state_dict(net_dict,strict=False)
+
+        # total_params = sum(p.numel() for p in model.parameters())
+        # print(f"Total parameters after load: {total_params:,}")
+
+        # def count_parameters(model, filepath="/disk2/home/yuehan.jin/project/2025rebuttal/para_rohydr.txt"):
+        #     with open(filepath, "w") as f:
+        #         print(f"{'Module':<50} {'Params':>12}", file=f)
+        #         print("="*65, file=f)
+        #         total_params = 0
+        #         for name, param in model.named_parameters():
+        #             if param.requires_grad:
+        #                 num_params = param.numel()
+        #                 total_params += num_params
+        #                 print(f"{name:<50} {num_params:>12}", file=f)
+        #         print("="*65, file=f)
+        #         print(f"{'Total Trainable Params':<50} {total_params:>12,}", file=f)
+
+        # count_parameters(model)
 
 
         while True:
@@ -81,6 +103,7 @@ class ROHYDR():
                         miss_one += 1
                     else:  # no missing
                         missing_modal=3
+                    # missing_modal=2
 
                     #Optimization Stage1
                     if missing_modal!=3:
@@ -160,7 +183,8 @@ class ROHYDR():
                         nn.utils.clip_grad_value_([param for param in model.parameters() if param.requires_grad],
                                                   self.args.grad_clip)
                     # store results
-                    train_loss += combine_loss.item()
+                    # train_loss += combine_loss.item()
+                    train_loss +=S1_loss.item()
                     y_pred.append(classify_output['M_lm'].cpu())
                     y_true.append(labels.cpu())
                     y_pred.append(classify_output['M_gt'].cpu())
@@ -186,8 +210,8 @@ class ROHYDR():
             cur_valid = val_results[self.args.KeyEval]
             scheduler.step(val_results['Loss'])
             # save each epoch model
-            model_save_path = 'pt/' + str(epochs) + '.pth'
-            #torch.save(model.state_dict(), model_save_path)
+            model_save_path = 'pretrained/' + str(epochs) + '.pth'
+            torch.save(model.state_dict(), model_save_path)
             # save best model
             isBetter = cur_valid <= (best_valid - 1e-6) if min_or_max == 'min' else cur_valid >= (best_valid + 1e-6)
             if isBetter:
@@ -236,6 +260,10 @@ class ROHYDR():
                     else:  # no missing
                         missing_modal=3
                         outputs = model(text, audio, vision, num_modal=3)
+                    
+                    # outputs = model(text, audio, vision, num_modal=2)
+                    # missing_modal=2
+                    
                     fusion_feature_x = outputs['Fusion_gt']
                     if missing_modal==3:
                         fusion_feature_lm = outputs['Fusion_lm']

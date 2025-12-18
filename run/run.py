@@ -118,7 +118,7 @@ def _run(args, num_workers=4, is_tune=False, from_sena=False):
     trainer = ATIO().getTrain(args)
 
     epoch_results = trainer.do_train(model, dataloader, return_epoch_results=from_sena)
-    model.load_state_dict(torch.load('pt/rohydr-{}.pth'.format(args.dataset_name)))
+    model.load_state_dict(torch.load('pretrained/rohydr-{}.pth'.format(args.dataset_name)))
 
     results = trainer.do_test(model, dataloader['test'], mode="TEST")
 

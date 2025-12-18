@@ -14,6 +14,8 @@ from torch.nn.parameter import Parameter
 
 from ...subNets_adv import BertTextEncoderAdversarial
 from ...subNets_adv.transformers_encoder.transformer import TransformerEncoder
+from .ditmodel import DiTDiffusionModule
+from diffusers import DDPMScheduler, DDIMScheduler
 
 __all__ = ['ROHYDR']
 
@@ -214,9 +216,23 @@ class ROHYDR(nn.Module):
         sigma = 25.0
         self.marginal_prob_std_fn = functools.partial(marginal_prob_std, sigma=sigma)
         self.diffusion_coeff_fn = functools.partial(diffusion_coeff, sigma=sigma) 
-        self.score_l = ScoreNet(marginal_prob_std=self.marginal_prob_std_fn)
-        self.score_v = ScoreNet(marginal_prob_std=self.marginal_prob_std_fn)
-        self.score_a = ScoreNet(marginal_prob_std=self.marginal_prob_std_fn)
+        
+        #diffusion model
+        self.DDPMScheduler =DDPMScheduler(
+            num_train_timesteps=1000,
+            beta_start=0.0001,
+            beta_end=0.02,
+            beta_schedule="linear"
+        )
+        self.DDIMScheduler = DDIMScheduler(
+            num_train_timesteps=1000,
+            beta_start=0.0001,
+            beta_end=0.02,
+            beta_schedule="linear"
+        )
+        self.score_l = DiTDiffusionModule()
+        self.score_v = DiTDiffusionModule()
+        self.score_a = DiTDiffusionModule()
 
         self.cat_lv = nn.Conv1d(self.d_l * 2, self.d_l, kernel_size=1, padding=0)
         self.cat_la = nn.Conv1d(self.d_l * 2, self.d_l, kernel_size=1, padding=0)
@@ -307,78 +323,74 @@ class ROHYDR(nn.Module):
         #  random select modality
         modal_idx = [0, 1, 2]  # (0:text, 1:vision, 2:audio)
         ava_modal_idx = sample(modal_idx, num_modal)  # sample available modality
+        
+        # num_modal=2
+        # ava_modal_idx=[0,2]
         if num_modal == 1:  # one modality is available
             if ava_modal_idx[0] == 0:  # has text
                 conditions = proj_x_l
-                loss_score_a = loss_fn(self.score_a, proj_x_a, self.marginal_prob_std_fn, condition=conditions)
-                loss_score_v = loss_fn(self.score_v, proj_x_v, self.marginal_prob_std_fn, condition=conditions)
+
+                loss_score_a= self.score_a.compute_loss(target_x=gt_a, cond=conditions, scheduler=self.DDPMScheduler, timesteps=1000)
+                dit_a = self.score_a.sample(cond=conditions,scheduler=self.DDIMScheduler)
+                loss_score_v= self.score_v.compute_loss(target_x=gt_v, cond=conditions, scheduler=self.DDPMScheduler, timesteps=1000)
+                dit_v = self.score_v.sample(cond=conditions,scheduler=self.DDIMScheduler)
+
                 loss_score_l = torch.tensor(0)
-                proj_x_a = Euler_Maruyama_sampler(self.score_a, self.marginal_prob_std_fn, self.diffusion_coeff_fn, text.size(0),
-                                                  device='cuda', condition=conditions)
-                proj_x_v = Euler_Maruyama_sampler(self.score_v, self.marginal_prob_std_fn, self.diffusion_coeff_fn, text.size(0),
-                                                  device='cuda', condition=conditions)
-                #  refine modality
-                proj_x_a = self.rec_a(proj_x_a)
-                proj_x_v = self.rec_v(proj_x_v)
+                proj_x_a = self.rec_a(dit_a)
+                proj_x_v = self.rec_v(dit_v)
                 loss_rec = self.MSE(proj_x_a, gt_a) + self.MSE(proj_x_v, gt_v)
             elif ava_modal_idx[0] == 1:  # has video
                 conditions = proj_x_v
-                loss_score_l = loss_fn(self.score_l, proj_x_l, self.marginal_prob_std_fn, condition=conditions)
-                loss_score_a = loss_fn(self.score_a, proj_x_a, self.marginal_prob_std_fn, condition=conditions)
-                loss_score_v = torch.tensor(0)
-                # Generate samples from score-based models with the Euler_Maruyama_sampler
-                proj_x_l = Euler_Maruyama_sampler(self.score_l, self.marginal_prob_std_fn, self.diffusion_coeff_fn, text.size(0),
-                                                  device='cuda', condition=conditions)
-                proj_x_a = Euler_Maruyama_sampler(self.score_a, self.marginal_prob_std_fn, self.diffusion_coeff_fn, text.size(0),
-                                                  device='cuda', condition=conditions)
-                #  refine modality
-                proj_x_l = self.rec_l(proj_x_l)
-                proj_x_a = self.rec_a(proj_x_a)
+                
+                loss_score_a= self.score_a.compute_loss(target_x=gt_a, cond=conditions, scheduler=self.DDPMScheduler, timesteps=1000)
+                dit_a = self.score_a.sample(cond=conditions,scheduler=self.DDIMScheduler)
+                loss_score_l= self.score_l.compute_loss(target_x=gt_l, cond=conditions, scheduler=self.DDPMScheduler, timesteps=1000)
+                dit_l = self.score_l.sample(cond=conditions,scheduler=self.DDIMScheduler)
+
+                proj_x_l = self.rec_l(dit_l)
+                proj_x_a = self.rec_a(dit_a)
+                
                 loss_rec = self.MSE(proj_x_l, gt_l) + self.MSE(proj_x_a, gt_a)
             else:  # has audio
                 conditions = proj_x_a
-                loss_score_l = loss_fn(self.score_l, proj_x_l, self.marginal_prob_std_fn, condition=conditions)
-                loss_score_v = loss_fn(self.score_v, proj_x_v, self.marginal_prob_std_fn, condition=conditions)
+
+                loss_score_v= self.score_v.compute_loss(target_x=gt_v, cond=conditions, scheduler=self.DDPMScheduler, timesteps=1000)
+                dit_v = self.score_v.sample(cond=conditions,scheduler=self.DDIMScheduler)
+                loss_score_l= self.score_l.compute_loss(target_x=gt_l, cond=conditions, scheduler=self.DDPMScheduler, timesteps=1000)
+                dit_l = self.score_l.sample(cond=conditions,scheduler=self.DDIMScheduler)
                 loss_score_a = torch.tensor(0)
-                # Generate samples from score-based models with the Euler_Maruyama_sampler
-                proj_x_l = Euler_Maruyama_sampler(self.score_l, self.marginal_prob_std_fn, self.diffusion_coeff_fn, text.size(0),
-                                                  device='cuda', condition=conditions)
-                proj_x_v = Euler_Maruyama_sampler(self.score_v, self.marginal_prob_std_fn, self.diffusion_coeff_fn, text.size(0),
-                                                  device='cuda', condition=conditions)
-                #  refine modality
-                proj_x_l = self.rec_l(proj_x_l)
-                proj_x_v = self.rec_v(proj_x_v)
+
+                proj_x_l = self.rec_l(dit_l)
+                proj_x_v = self.rec_v(dit_v)
+
                 loss_rec = self.MSE(proj_x_l, gt_l) + self.MSE(proj_x_v, gt_v)
         if num_modal == 2:  # two modalities are available
             if set(modal_idx) - set(ava_modal_idx) == {0}:  # L is missing (V,A available)
                 conditions = self.cat_va(torch.cat([proj_x_v, proj_x_a], dim=1))  # cat two avail modalities as conditions
-                loss_score_l = loss_fn(self.score_l, proj_x_l, self.marginal_prob_std_fn, condition=conditions)
+                
+                loss_score_l= self.score_l.compute_loss(target_x=gt_l, cond=conditions, scheduler=self.DDPMScheduler, timesteps=1000)
+                dit_l = self.score_l.sample(cond=conditions,scheduler=self.DDIMScheduler)
                 loss_score_v, loss_score_a = torch.tensor(0), torch.tensor(0)
-                # Generate samples from score-based models with the Euler_Maruyama_sampler
-                proj_x_l = Euler_Maruyama_sampler(self.score_l, self.marginal_prob_std_fn, self.diffusion_coeff_fn, text.size(0),
-                                                  device='cuda', condition=conditions)
-                #  refine modality
-                proj_x_l = self.rec_l(proj_x_l)
+                proj_x_l = self.rec_l(dit_l)
+
                 loss_rec = self.MSE(proj_x_l, gt_l)
             if set(modal_idx) - set(ava_modal_idx) == {1}:  # V is missing (L,A available)
                 conditions = self.cat_la(torch.cat([proj_x_l, proj_x_a], dim=1))  # cat two avail modalities as conditions
-                loss_score_v = loss_fn(self.score_v, proj_x_v, self.marginal_prob_std_fn, condition=conditions)
+
+                loss_score_v= self.score_v.compute_loss(target_x=gt_v, cond=conditions, scheduler=self.DDPMScheduler, timesteps=1000)
+                dit_v = self.score_v.sample(cond=conditions,scheduler=self.DDIMScheduler)
                 loss_score_l, loss_score_a = torch.tensor(0), torch.tensor(0)
-                # Generate samples from score-based models with the Euler_Maruyama_sampler
-                proj_x_v = Euler_Maruyama_sampler(self.score_v, self.marginal_prob_std_fn, self.diffusion_coeff_fn, text.size(0),
-                                                  device='cuda', condition=conditions)
-                #  refine modality
-                proj_x_v = self.rec_v(proj_x_v)
+                proj_x_v = self.rec_v(dit_v)
+
                 loss_rec = self.MSE(proj_x_v, gt_v)
             if set(modal_idx) - set(ava_modal_idx) == {2}:  # A is missing (L,V available)
                 conditions = self.cat_lv(torch.cat([proj_x_l, proj_x_v], dim=1))  # cat two avail modalities as conditions
-                loss_score_a = loss_fn(self.score_a, proj_x_a, self.marginal_prob_std_fn, condition=conditions)
+
+                loss_score_a= self.score_a.compute_loss(target_x=gt_a, cond=conditions, scheduler=self.DDPMScheduler, timesteps=1000)
+                dit_a = self.score_a.sample(cond=conditions,scheduler=self.DDIMScheduler)
                 loss_score_l, loss_score_v = torch.tensor(0), torch.tensor(0)
-                # Generate samples from score-based models with the Euler_Maruyama_sampler
-                proj_x_a = Euler_Maruyama_sampler(self.score_a, self.marginal_prob_std_fn, self.diffusion_coeff_fn, text.size(0),
-                                                  device='cuda', condition=conditions)
-                #  refine modality
-                proj_x_a = self.rec_a(proj_x_a)
+                proj_x_a = self.rec_a(dit_a)
+
                 loss_rec = self.MSE(proj_x_a, gt_a)
         if num_modal == 3:  # no missing
             loss_score_l, loss_score_v, loss_score_a = torch.tensor(0), torch.tensor(0), torch.tensor(0)
