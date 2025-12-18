@@ -9,11 +9,7 @@ Please refer to `requirements.txt` for more information.
 
 
 ### Datasets
-You can access the CMU-MOSI and CMU-MOSEI datasets via the CMU Multimodal Data SDK or obtain them from previously released open-source multimodal emotion recognition projects. We also provided the datasets in links bellow: 
-- [MOSI](https://pan.baidu.com/s/1DEqb_K79jkk6eUdX4NMYMQ?pwd=6rpv)
-- [MOSEI](https://pan.baidu.com/s/1VcsE_lZU265x6roJXbcT_w?pwd=wigp)
-
-Downloaded datasets can be put into the `dataset/` directory and organized as `dataset/MOSI/aligned_50.pkl` and `dataset/MOSEI/aligned_50.pkl`. Alternatively, you can modify the dataset path in `config/config.json`.
+We provided the datasets [here](https://pan.baidu.com/s/1LoxKH5U60BQJ2O7OGIKGTw?pwd=gvfi). Downloaded datasets can be put into the `dataset/` directory. Alternatively, you can modify the dataset path in `config/config.json`.
 
 
 
