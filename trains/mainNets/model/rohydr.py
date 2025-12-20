@@ -225,7 +225,7 @@ class ROHYDR(nn.Module):
             beta_schedule="linear"
         )
         self.DDIMScheduler = DDIMScheduler(
-            num_train_timesteps=1000,
+            num_train_timesteps=50,
             beta_start=0.0001,
             beta_end=0.02,
             beta_schedule="linear"
