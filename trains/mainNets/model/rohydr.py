@@ -347,9 +347,9 @@ class ROHYDR(nn.Module):
                 loss_score_l= self.score_l.compute_loss(target_x=gt_l, cond=conditions, scheduler=self.DDPMScheduler, timesteps=1000)
                 dit_l = self.score_l.sample(cond=conditions,scheduler=self.DDIMScheduler)
 
+                loss_score_v = torch.tensor(0)
                 proj_x_l = self.rec_l(dit_l)
                 proj_x_a = self.rec_a(dit_a)
-                
                 loss_rec = self.MSE(proj_x_l, gt_l) + self.MSE(proj_x_a, gt_a)
             else:  # has audio
                 conditions = proj_x_a
@@ -358,11 +358,10 @@ class ROHYDR(nn.Module):
                 dit_v = self.score_v.sample(cond=conditions,scheduler=self.DDIMScheduler)
                 loss_score_l= self.score_l.compute_loss(target_x=gt_l, cond=conditions, scheduler=self.DDPMScheduler, timesteps=1000)
                 dit_l = self.score_l.sample(cond=conditions,scheduler=self.DDIMScheduler)
-                loss_score_a = torch.tensor(0)
 
+                loss_score_a = torch.tensor(0)
                 proj_x_l = self.rec_l(dit_l)
                 proj_x_v = self.rec_v(dit_v)
-
                 loss_rec = self.MSE(proj_x_l, gt_l) + self.MSE(proj_x_v, gt_v)
         if num_modal == 2:  # two modalities are available
             if set(modal_idx) - set(ava_modal_idx) == {0}:  # L is missing (V,A available)
